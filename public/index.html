@@ -13,6 +13,7 @@
         :redirectUri="redirectUri"
       ></auth-component>
       <button @click="logOut">Log out</button>
+
       <search-bar v-if="isAuthorized" @search="searchArtists"></search-bar>
       <search-results
         v-if="searchResults.length > 0"
@@ -160,16 +161,15 @@
             post: null,
             error: null,
             accessToken: '',
+            isAuthorized: false,
             clientId: 'd12d177d818048baa656df823fc9137d',
             redirectUri: 'http://127.0.0.1:8080/',
             searchResults: []
           }
         },
         created() {
+          console.log('this. :>> ', this.isAuthorized)
           const code = new URLSearchParams(window.location.search).get('code')
-          if (localStorage.getItem('access_token')) {
-            console.log(localStorage.getItem('access_token'))
-          }
           if (code) {
             this.exchangeToken(code)
             window.history.replaceState({}, document.title, '/')
@@ -180,7 +180,7 @@
         methods: {
           logOut() {
             localStorage.clear()
-            this.accessToken = ''
+            this.isAuthorized = false
           },
           test() {
             const codeVerifier = new URLSearchParams(
@@ -251,8 +251,14 @@
             try {
               this.error = this.post = null
               this.loading = true
+              console.log('this.access_token', this.access_token)
               const response = await fetch(
-                `https://api.spotify.com/v1/search?q=${artistName}&type=artist`
+                `https://api.spotify.com/v1/search?q=${artistName}&type=artist&limit=1`,
+                {
+                  headers: {
+                    Authorization: 'Bearer ' + this.access_token
+                  }
+                }
               )
               const data = await response.json()
 
@@ -300,6 +306,8 @@
               .then(data => {
                 localStorage.setItem('access_token', data.access_token)
                 localStorage.setItem('refresh_token', data.refresh_token)
+
+                this.isAuthorized = true
               })
               .catch(error => {
                 console.error('Error:', error)
