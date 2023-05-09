@@ -161,10 +161,61 @@
         },
         methods: {
           test() {
-            console.log(
-              'window.location.href :>> ',
-              new URLSearchParams(window.location.search).get('code')
-            )
+            const codeVerifier = new URLSearchParams(
+              window.location.search
+            ).get('code')
+            const code_verifier = localStorage.getItem('codeVerifier')
+            const codeChallenge = generateCodeChallenge(code_verifier)
+
+            console.log(verifyCodeChallenge(codeVerifier, codeChallenge))
+
+            async function generateCodeChallenge(codeVerifier) {
+              const digest = await crypto.subtle.digest(
+                'SHA-256',
+                new TextEncoder().encode(codeVerifier)
+              )
+
+              return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/=/g, '')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+            }
+
+            function verifyCodeChallenge(codeVerifier, codeChallenge) {
+              const encodedVerifier = base64UrlEncode(codeVerifier)
+
+              // Generate the expected code challenge based on the code verifier
+              const expectedCodeChallenge = sha256(encodedVerifier)
+
+              // Compare the expected code challenge with the provided code challenge
+              return expectedCodeChallenge === codeChallenge
+            }
+
+            // Helper function to base64 URL encode a string
+            function base64UrlEncode(str) {
+              let base64 = btoa(str)
+              base64 = base64
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '')
+              return base64
+            }
+
+            // Helper function to compute the SHA-256 hash of a string
+            async function sha256(str) {
+              const encoder = new TextEncoder()
+              const data = encoder.encode(str)
+
+              const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+
+              const hashArray = Array.from(new Uint8Array(hashBuffer))
+
+              const hashHex = hashArray
+                .map(byte => byte.toString(16).padStart(2, '0'))
+                .join('')
+
+              return hashHex
+            }
           },
           authorizeUser() {
             // Handle user authorization logic
@@ -200,36 +251,22 @@
             const redirect_uri = this.redirectUri
             const code_verifier = localStorage.getItem('codeVerifier')
 
+            const params = new URLSearchParams()
+            params.append('client_id', client_id)
+            params.append('grant_type', 'authorization_code')
+            params.append('code', code)
+            params.append('redirect_uri', redirect_uri)
+            params.append('code_verifier', code_verifier)
+
             fetch('https://accounts.spotify.com/api/token', {
               method: 'POST',
               headers: {
-                'Content-Type':
-                  'application/x-www-form-urlencoded;charset=UTF-8'
+                'Content-Type': 'application/x-www-form-urlencoded'
               },
-              body: new URLSearchParams({
-                client_id,
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri,
-                code_verifier
-              })
+              body: params.toString()
+            }).then(async response => {
+              console.log('response :>> ', response.json())
             })
-              .then(async response => {
-                if (response.ok) {
-                  return response.json()
-                } else {
-                  throw { response, error: await response.json() }
-                }
-              })
-              .then(data => {
-                processTokenResponse(data)
-
-                // clear search query params in the url
-                window.history.replaceState({}, document.title, '/')
-              })
-              .catch(err => {
-                console.log('err :>> ', err)
-              })
           }
         }
       })
