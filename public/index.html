@@ -169,8 +169,10 @@
           const code = new URLSearchParams(window.location.search).get('code')
           if (localStorage.getItem('access_token')) {
             console.log(localStorage.getItem('access_token'))
-          } else if (code) {
+          }
+          if (code) {
             this.exchangeToken(code)
+            window.history.replaceState({}, document.title, '/')
           } else {
             this.accessToken = ''
           }
@@ -179,7 +181,6 @@
           logOut() {
             localStorage.clear()
             this.accessToken = ''
-            window.location = this.redirectUri
           },
           test() {
             const codeVerifier = new URLSearchParams(
