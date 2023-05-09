@@ -1,59 +1,244 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>
-      Example of the Authorization Code Flow with Proof Key for Code Exchange
-      (PKCE) with Spotify
-    </title>
-    <style type="text/css">
-      #login,
-      #loggedin {
-        display: none;
-      }
-
-      td {
-        border: grey solid 1px;
-        overflow-wrap: anywhere;
-      }
-
-      td:first-child {
-        min-width: 150px;
-      }
-    </style>
+    <title>Spotify Artist Search</title>
+    <link rel="stylesheet" type="text/css" href="spotify.css" />
   </head>
-
   <body>
-    <div>
-      <div id="login">
-        <h1>
-          This is an example of the Authorization Code Flow with Proof Key for
-          Code Exchange (PKCE)
-        </h1>
-        <button id="login-button">Log in with Spotify</button>
-      </div>
-      <div id="loggedin">
-        <div id="main"></div>
-        <div id="oauth"></div>
-        <input
-          type="text"
-          name="artist-name"
-          id="artist-name"
-          value="Океан Ельзи"
-        />
-        <button id="artist-button">get your artist</button>
-        <button id="songs-button">start collect stats</button>
-        <button id="lyrics-button">prepare lyrics</button>
-        <button id="calculate-button">start calculate</button>
-
-        <button id="refresh-button">Refresh access token</button>
-        <button id="logout-button">Logout</button>
-        <div id="tester" style="width: auto; height: auto"></div>
-      </div>
+    <div id="app">
+      <auth-component
+        v-if="!isAuthorized"
+        @authorize="authorizeUser"
+        :clientId="clientId"
+        :redirectUri="redirectUri"
+      ></auth-component>
+      <button @click="test">Log</button>
+      <search-bar v-if="isAuthorized" @search="searchArtists"></search-bar>
+      <search-results
+        v-if="searchResults.length > 0"
+        :results="searchResults"
+      ></search-results>
     </div>
+
+    <script src="https://unpkg.com/vue@3.2.6/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <script>
+      const AuthComponent = {
+        props: ['clientId', 'redirectUri'],
+        template: `
+              <div class="auth-container">
+                <h1>Spotify Artist Search</h1>
+                <p>Please log in with Spotify to use the Spotify API.</p>
+                <button @click="authorize">Log in with Spotify</button>
+              </div>
+            `,
+        methods: {
+          authorize() {
+            const codeVerifier = this.generateRandomString(64)
+            const codeChallenge = this.generateCodeChallenge(codeVerifier)
+            const state = this.generateRandomString(64)
+
+            localStorage.setItem('codeVerifier', codeVerifier)
+            localStorage.setItem('state', state)
+
+            //TODO Why props are undefined
+
+            const clientId = 'd12d177d818048baa656df823fc9137d'
+            const redirectUri = 'http://127.0.0.1:8080/'
+
+            const authorizationUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(
+              redirectUri
+            )}&code_challenge_method=S256&code_challenge=${encodeURIComponent(
+              codeChallenge
+            )}&state=${state}`
+
+            window.location.href = authorizationUrl
+          },
+          generateRandomString(length) {
+            let text = ''
+            const possible =
+              'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+
+            for (let i = 0; i < length; i++) {
+              text += possible.charAt(
+                Math.floor(Math.random() * possible.length)
+              )
+            }
+            return text
+          },
+          async generateCodeChallenge(codeVerifier) {
+            const digest = await crypto.subtle.digest(
+              'SHA-256',
+              new TextEncoder().encode(codeVerifier)
+            )
+
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+              .replace(/=/g, '')
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+          }
+        }
+      }
+
+      const SearchBar = {
+        data() {
+          return {
+            artistName: ''
+          }
+        },
+        template: `
+                    <div class="search-container">
+                      <h1>Spotify Artist Search</h1>
+                      <form @submit.prevent="search">
+                        <label for="artist">Artist:</label>
+                        <input type="text" id="artist" v-model="artistName">
+                        <button type="submit">Search</button>
+                      </form>
+                    </div>
+                  `,
+        methods: {
+          search() {
+            this.$emit('search', this.artistName)
+          }
+        }
+      }
+
+      const SearchResults = {
+        props: ['results'],
+        template: `
+                    <div class="results-container">
+                      <h2>Search Results</h2>
+                      <ul>
+                        <li v-for="result in results" :key="result.id">
+                          <h3>{{ result.name }}</h3>
+                          <img :src="result.image" alt="Artist Image">
+                          <ul>
+                            <li v-for="song in result.songs" :key="song">{{ song }}</li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </div>
+                  `
+      }
+
+      const loginBar = {
+        props: ['results'],
+        template: `
+                    <div class="results-container">
+                      <h2>Search Results</h2>
+                      <ul>
+                        <li v-for="result in results" :key="result.id">
+                          <h3>{{ result.name }}</h3>
+                          <img :src="result.image" alt="Artist Image">
+                          <ul>
+                            <li v-for="song in result.songs" :key="song">{{ song }}</li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </div>
+                  `
+      }
+
+      const app = Vue.createApp({
+        data() {
+          return {
+            status: 'none',
+            post: null,
+            error: null,
+            accessToken: '',
+            clientId: 'd12d177d818048baa656df823fc9137d',
+            redirectUri: 'http://127.0.0.1:8080/',
+            searchResults: []
+          }
+        },
+        created() {
+          const code = new URLSearchParams(window.location.search).get('code')
+          if (code) {
+            this.exchangeToken(code)
+          } else {
+            this.accessToken = ''
+          }
+        },
+        methods: {
+          test() {
+            console.log(
+              'window.location.href :>> ',
+              new URLSearchParams(window.location.search).get('code')
+            )
+          },
+          authorizeUser() {
+            // Handle user authorization logic
+            // Set 'isAuthorized' to true once the user is authorized
+            this.isAuthorized = true
+          },
+          async searchArtists(artistName) {
+            try {
+              this.error = this.post = null
+              this.loading = true
+              const response = await fetch(
+                `https://api.spotify.com/v1/search?q=${artistName}&type=artist`
+              )
+              const data = await response.json()
+
+              // Extract relevant information from the API response
+              const artists = data.artists.items.map(artist => ({
+                id: artist.id,
+                name: artist.name,
+                image: artist.images[0]?.url || '',
+                albums: []
+              }))
+
+              this.searchResults = artists
+            } catch (error) {
+              this.error = true
+              this.loading = this.post = null
+              console.error(error)
+            }
+          },
+          exchangeToken(code) {
+            const client_id = this.clientId
+            const redirect_uri = this.redirectUri
+            const code_verifier = localStorage.getItem('codeVerifier')
+
+            fetch('https://accounts.spotify.com/api/token', {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/x-www-form-urlencoded;charset=UTF-8'
+              },
+              body: new URLSearchParams({
+                client_id,
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri,
+                code_verifier
+              })
+            })
+              .then(async response => {
+                if (response.ok) {
+                  return response.json()
+                } else {
+                  throw { response, error: await response.json() }
+                }
+              })
+              .then(data => {
+                processTokenResponse(data)
+
+                // clear search query params in the url
+                window.history.replaceState({}, document.title, '/')
+              })
+              .catch(err => {
+                console.log('err :>> ', err)
+              })
+          }
+        }
+      })
+
+      app.component('auth-component', AuthComponent)
+      app.component('search-bar', SearchBar)
+      app.component('search-results', SearchResults)
+
+      app.mount('#app')
+    </script>
   </body>
-  <script
-    src="https://cdn.plot.ly/plotly-2.20.0.min.js"
-    charset="utf-8"
-  ></script>
-  <script src="main.js"></script>
 </html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      Example of the Authorization Code Flow with Proof Key for Code Exchange
+      (PKCE) with Spotify
+    </title>
+    <style type="text/css">
+      #login,
+      #loggedin {
+        display: none;
+      }
+
+      td {
+        border: grey solid 1px;
+        overflow-wrap: anywhere;
+      }
+
+      td:first-child {
+        min-width: 150px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div>
+      <div id="login">
+        <h1>
+          This is an example of the Authorization Code Flow with Proof Key for
+          Code Exchange (PKCE)
+        </h1>
+        <button id="login-button">Log in with Spotify</button>
+      </div>
+      <div id="loggedin">
+        <div id="main"></div>
+        <div id="oauth"></div>
+        <input
+          type="text"
+          name="artist-name"
+          id="artist-name"
+          value="Океан Ельзи"
+        />
+        <button id="artist-button">get your artist</button>
+        <button id="songs-button">start collect stats</button>
+        <button id="lyrics-button">prepare lyrics</button>
+        <button id="calculate-button">start calculate</button>
+
+        <button id="refresh-button">Refresh access token</button>
+        <button id="logout-button">Logout</button>
+        <div id="tester" style="width: auto; height: auto"></div>
+      </div>
+    </div>
+  </body>
+  <script
+    src="https://cdn.plot.ly/plotly-2.20.0.min.js"
+    charset="utf-8"
+  ></script>
+
+  <script src="main.js"></script>
+</html>

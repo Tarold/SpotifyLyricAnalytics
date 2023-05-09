@@ -1,0 +1,526 @@
+<script type="importmap">
+  {
+    "imports": {
+      "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+    }
+  }
+</script>
+
+<style type="text/css">
+  #login,
+  #loggedin {
+    display: none;
+  }
+
+  td {
+    border: grey solid 1px;
+    overflow-wrap: anywhere;
+  }
+
+  td:first-child {
+    min-width: 150px;
+  }
+</style>
+
+<div id="app">
+  <head>
+    <title>
+      Example of the Authorization Code Flow with Proof Key for Code Exchange
+      (PKCE) with Spotify
+    </title>
+  </head>
+
+  <body>
+    <div>
+      <div id="login">
+        <h1>
+          This is an example of the Authorization Code Flow with Proof Key for
+          Code Exchange (PKCE)
+        </h1>
+        <button id="login-button">Log in with Spotify</button>
+      </div>
+      <div id="loggedin">
+        <div id="main"></div>
+        <div id="oauth"></div>
+        <input
+          type="text"
+          name="artist-name"
+          id="artist-name"
+          value="Океан Ельзи"
+        />
+        <button @click="getArtist">get your artist</button>
+        <button @click="getAllAlbums">start collect stats</button>
+        <button @click="addLyrics">prepare lyrics</button>
+        <button @click="calculateSongs">start calculate</button>
+
+        <button @click="refreshToken">Refresh access token</button>
+        <button @click="logout">Logout</button>
+        <div id="tester" style="width: auto; height: auto"></div>
+      </div>
+    </div>
+  </body>
+</div>
+
+<script type="module">
+  import { createApp } from 'vue'
+
+  createApp({
+    data() {
+      return {
+        client_id: 'd12d177d818048baa656df823fc9137d',
+        redirect_uri: 'http://127.0.0.1:8080/',
+        message: 'Hello Vue!',
+        access_token: null,
+        refresh_token: null,
+        expires_at: null,
+        mainPlaceholder: '',
+        oauthPlaceholder: '',
+        args: undefined,
+        code: undefined,
+        artist_name: 'Океан Ельзи'
+      }
+    },
+    mounted() {
+      this.access_token = localStorage.getItem('access_token') || null
+      this.refresh_token = localStorage.getItem('refresh_token') || null
+      this.expires_at = localStorage.getItem('expires_at') || null
+
+      this.mainPlaceholder = document.getElementById('main')
+      this.oauthPlaceholder = document.getElementById('oauth')
+
+      this.args = new URLSearchParams(window.location.search)
+      this.code = this.args.get('code')
+
+      if (this.code) {
+        exchangeToken(this.code)
+      } else if (this.access_token && this.refresh_token && this.expires_at) {
+        document.getElementById('loggedin').style.display = 'unset'
+
+        this.oauthPlaceholder.innerHTML = this.oAuthTemplate({
+          access_token: this.access_token,
+          refresh_token: this.refresh_token,
+          expires_at: this.expires_at
+        })
+
+        this.getUserData()
+      } else {
+        // we are not logged in so show the login button
+        document.getElementById('login').style.display = 'unset'
+      }
+    },
+    methods: {
+      generateRandomString(length) {
+        let text = ''
+        const possible =
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+
+        for (let i = 0; i < length; i++) {
+          text += possible.charAt(Math.floor(Math.random() * possible.length))
+        }
+        return text
+      },
+      async generateCodeChallenge(codeVerifier) {
+        const digest = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(codeVerifier)
+        )
+
+        return btoa(String.fromCharCode(...new Uint8Array(digest)))
+          .replace(/=/g, '')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+      },
+      generateUrlWithSearchParams(url, params) {
+        const urlObject = new URL(url)
+        urlObject.search = new URLSearchParams(params).toString()
+
+        return urlObject.toString()
+      },
+      redirectToSpotifyAuthorizeEndpoint() {
+        const codeVerifier = generateRandomString(64)
+
+        generateCodeChallenge(codeVerifier).then(code_challenge => {
+          window.localStorage.setItem('code_verifier', codeVerifier)
+
+          // Redirect to example:
+          // GET https://accounts.spotify.com/authorize?response_type=code&client_id=77e602fc63fa4b96acff255ed33428d3&redirect_uri=http%3A%2F%2Flocalhost&scope=user-follow-modify&state=e21392da45dbf4&code_challenge=KADwyz1X~HIdcAG20lnXitK6k51xBP4pEMEZHmCneHD1JhrcHjE1P3yU_NjhBz4TdhV6acGo16PCd10xLwMJJ4uCutQZHw&code_challenge_method=S256
+
+          window.location = generateUrlWithSearchParams(
+            'https://accounts.spotify.com/authorize',
+            {
+              response_type: 'code',
+              client_id,
+              scope: 'user-read-private user-read-email',
+              code_challenge_method: 'S256',
+              code_challenge,
+              redirect_uri
+            }
+          )
+
+          // If the user accepts spotify will come back to your application with the code in the response query string
+          // Example: http://127.0.0.1:8080/?code=NApCCg..BkWtQ&state=profile%2Factivity
+        })
+      },
+      exchangeToken(code) {
+        const code_verifier = localStorage.getItem('code_verifier')
+
+        fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          },
+          body: new URLSearchParams({
+            client_id,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri,
+            code_verifier
+          })
+        })
+          .then(addThrowErrorToFetch)
+          .then(data => {
+            processTokenResponse(data)
+
+            // clear search query params in the url
+            window.history.replaceState({}, document.title, '/')
+          })
+          .catch(handleError)
+      },
+      getArtist() {
+        fetch(
+          `https://api.spotify.com/v1/search?q=${this.artist_name}&type=artist&limit=1`,
+          {
+            headers: {
+              Authorization: 'Bearer ' + this.access_token
+            }
+          }
+        )
+          .then(async response => {
+            if (response.ok) {
+              return response.json()
+            } else {
+              throw await response.json()
+            }
+          })
+          .then(data => {
+            localStorage.setItem(
+              'artist',
+              JSON.stringify(data.artists.items[0])
+            )
+            console.log(data.artists.items[0])
+          })
+          .catch(error => {
+            console.error(error)
+            this.mainPlaceholder.innerHTML = this.errorTemplate(error.error)
+          })
+      },
+      getAllAlbums() {
+        let artist_id = JSON.parse(localStorage.getItem('artist')).id
+        localStorage.setItem('albums', JSON.stringify([]))
+        fetchAlbums(`https://api.spotify.com/v1/artists/${artist_id}/albums`)
+      },
+      fetchAlbums(irl) {
+        fetch(irl, {
+          headers: {
+            Authorization: 'Bearer ' + this.access_token
+          }
+        })
+          .then(async response => {
+            if (response.ok) {
+              return response.json()
+            } else {
+              throw await response.json()
+            }
+          })
+          .then(data => {
+            let albums = JSON.parse(localStorage.getItem('albums'))
+            albums = [...albums, ...data.items]
+            localStorage.setItem('albums', JSON.stringify(albums))
+            if (data.next) {
+              fetchAlbums(data.next)
+            } else {
+              getAllSongs()
+            }
+          })
+          .catch(error => {
+            console.error(error)
+            this.mainPlaceholder.innerHTML = this.errorTemplate(error.error)
+          })
+      },
+      getAllSongs() {
+        const albums = JSON.parse(localStorage.getItem('albums'))
+        localStorage.setItem('songs', '[]')
+        albums.forEach(album => {
+          fetchSongs(`https://api.spotify.com/v1/albums/${album.id}/tracks`)
+        })
+      },
+      fetchSongs(irl) {
+        fetch(irl, {
+          headers: {
+            Authorization: 'Bearer ' + this.access_token
+          }
+        })
+          .then(async response => {
+            if (response.ok) {
+              return response.json()
+            } else {
+              throw await response.json()
+            }
+          })
+          .then(data => {
+            let songs = JSON.parse(localStorage.getItem('songs'))
+            songs = [...songs, ...data.items]
+            localStorage.setItem('songs', JSON.stringify(songs))
+            if (data.next) {
+              fetchSongs(data.next)
+            } else {
+              console.log('songs :>> ', songs)
+            }
+          })
+          .catch(error => {
+            console.error(error)
+            this.mainPlaceholder.innerHTML = this.errorTemplate(error.error)
+          })
+      },
+      addLyrics() {
+        try {
+          const songs = JSON.parse(localStorage.getItem('songs'))
+          songs.forEach(song => {
+            fetch(
+              `https://spotify-lyric-api.herokuapp.com/?url=https://open.spotify.com/track/${song.id}`
+            )
+              .then(async response => {
+                if (response.ok) {
+                  return response.json()
+                } else {
+                  throw await response.json()
+                }
+              })
+              .then(data => {
+                song.text = data.lines
+                localStorage.setItem('songs', JSON.stringify(songs))
+              })
+              .catch(error => {
+                song.text = undefined
+                localStorage.setItem('songs', JSON.stringify(songs))
+                console.log(error.message, song.name)
+                // error.message == 'lyrics for this track is not available on spotify!'
+                this.mainPlaceholder.innerHTML = this.errorTemplate(error.error)
+              })
+          })
+        } catch (error) {
+          console.error(error)
+          this.mainPlaceholder.innerHTML = this.errorTemplate(error)
+        }
+      },
+      calculateSongs() {
+        try {
+          const songs = JSON.parse(localStorage.getItem('songs'))
+          songs.forEach(song => {
+            let counter = {}
+            if (song.text) {
+              song.text.forEach(line => {
+                counter = countWords(line.words, counter)
+              })
+            }
+            song.stats = counter
+          })
+
+          localStorage.setItem('songs', JSON.stringify(songs))
+          console.log('songs :>> ', songs)
+
+          if (songs) {
+            let liba = {}
+            songs.forEach(song => {
+              liba = addWordCounts(liba, song.stats)
+            })
+            liba = sortWordCount(liba)
+            TESTER = document.getElementById('tester')
+            Plotly.newPlot(
+              TESTER,
+              [
+                {
+                  x: Object.keys(liba),
+                  y: Object.values(liba)
+                }
+              ],
+              {
+                margin: { t: 0 }
+              }
+            )
+          }
+        } catch (error) {
+          console.log(error)
+          this.mainPlaceholder.innerHTML = this.errorTemplate(error)
+        }
+      },
+      countWords(str, wordCount) {
+        const words = str
+          .toLowerCase()
+          .split(/[\s.,?!:;'"()\u2014\u2013♪]+|['’]/)
+          .filter(word => word !== '')
+
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i]
+          if (!wordCount[word]) {
+            wordCount[word] = 1
+          } else {
+            wordCount[word]++
+          }
+        }
+
+        return wordCount
+      },
+      sortWordCount(wordCount) {
+        const entries = Object.entries(wordCount)
+        entries.sort((a, b) => b[1] - a[1])
+        const result = {}
+        entries.forEach(([word, count]) => {
+          result[word] = count
+        })
+        return result
+      },
+      addWordCounts(wordCount1, wordCount2) {
+        const result = { ...wordCount2 }
+
+        for (const word in wordCount1) {
+          if (wordCount1.hasOwnProperty(word)) {
+            const count = wordCount1[word]
+            result[word] = (result[word] || 0) + count
+          }
+        }
+
+        return result
+      },
+      refreshToken() {
+        fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          },
+          body: new URLSearchParams({
+            client_id: this.client_id,
+            grant_type: 'refresh_token',
+            refresh_token: this.refresh_token
+          })
+        })
+          .then(this.addThrowErrorToFetch)
+          .then(this.processTokenResponse)
+          .catch(this.handleError)
+      },
+      handleError(error) {
+        console.error(error)
+        this.mainPlaceholder.innerHTML = this.errorTemplate({
+          status: error.response.status,
+          message: error.error.error_description
+        })
+      },
+      async addThrowErrorToFetch(response) {
+        if (response.ok) {
+          return response.json()
+        } else {
+          throw { response, error: await response.json() }
+        }
+      },
+      logout() {
+        localStorage.clear()
+        window.location.reload()
+      },
+      processTokenResponse(data) {
+        console.log(data)
+
+        this.access_token = data.access_token
+        this.refresh_token = data.refresh_token
+
+        const t = new Date()
+        expires_at = t.setSeconds(t.getSeconds() + data.expires_in)
+
+        localStorage.setItem('access_token', this.access_token)
+        localStorage.setItem('refresh_token', this.refresh_token)
+        localStorage.setItem('expires_at', this.expires_at)
+
+        this.oauthPlaceholder.innerHTML = this.oAuthTemplate({
+          access_token: this.access_token,
+          refresh_token: this.refresh_token,
+          expires_at: this.expires_at
+        })
+
+        // load data of logged in user
+        getUserData()
+      },
+      getUserData() {
+        fetch('https://api.spotify.com/v1/me', {
+          headers: {
+            Authorization: 'Bearer ' + this.access_token
+          }
+        })
+          .then(async response => {
+            if (response.ok) {
+              return response.json()
+            } else {
+              throw await response.json()
+            }
+          })
+          .then(data => {
+            console.log(data)
+            document.getElementById('login').style.display = 'none'
+            document.getElementById('loggedin').style.display = 'unset'
+            this.mainPlaceholder.innerHTML = userProfileTemplate(data)
+          })
+          .catch(error => {
+            console.error(error)
+            this.mainPlaceholder.innerHTML = this.errorTemplate(error.error)
+          })
+      },
+      userProfileTemplate(data) {
+        return `
+    <div>
+      <h1>Logged in as ${data.display_name}</h1>
+      <table>
+        <tr><td>Display name</td><td>${data.display_name}</td></tr>
+        <tr><td>Id</td><td>${data.id}</td></tr>
+        <tr><td>Email</td><td>${data.email}</td></tr>
+        <tr><td>Spotify URI</td><td><a href="${data.external_urls.spotify}">${data.external_urls.spotify}</a></td></tr>
+        <tr><td>Link</td><td><a :href="data.href">${data.href}</a></td></tr>
+        <tr><td>Profile Image</td><td><a :href="data.images[0]?.url">${data.images[0]?.url}</a></td></tr>
+        <tr><td>Country</td><td>${data.country}</td></tr>
+      </table>
+    </div>
+  `
+      },
+      oAuthTemplate(data) {
+        return `<h2>oAuth info</h2>
+        <table>
+          <tr>
+              <td>Access token</td>
+              <td>${data.access_token}</td>
+          </tr>
+          <tr>
+              <td>Refresh token</td>
+              <td>${data.refresh_token}</td>
+          </tr>
+          <tr>
+              <td>Expires at</td>
+              <td>${new Date(
+                parseInt(data.expires_at, 10)
+              ).toLocaleString()}</td>
+          </tr>
+        </table>`
+      },
+      errorTemplate(data) {
+        return `<h2>Error info</h2>
+        <table>
+          <tr>
+              <td>Status</td>
+              <td>${data.status}</td>
+          </tr>
+          <tr>
+              <td>Message</td>
+              <td>${data.message}</td>
+          </tr>
+        </table>`
+      }
+    }
+  }).mount('#app')
+</script>
+<script src="https://cdn.plot.ly/plotly-2.20.0.min.js" charset="utf-8"></script>
