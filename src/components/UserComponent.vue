@@ -19,6 +19,8 @@
 </template>
 
 <script>
+const { getMe } = require('./../api')
+
 export default {
   name: 'UserComponent',
   props: ['client_id', 'redirect_uri'],
@@ -49,28 +51,7 @@ export default {
       this.$emit('logout')
     },
     async getProfile () {
-      async function getData () {
-        let accessToken = localStorage.getItem('access_token')
-
-        try {
-          const response = await fetch('https://api.spotify.com/v1/me', {
-            headers: {
-              Authorization: 'Bearer ' + accessToken
-            }
-          })
-
-          if (!response.ok) {
-            throw new Error('Request failed')
-          }
-
-          return response
-        } catch (error) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-          return getData()
-        }
-      }
-      return getData()
+      return getMe()
         .then(response => {
           return response.json()
         })
