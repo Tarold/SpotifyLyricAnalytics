@@ -1,24 +1,24 @@
-# Spotify Web Authorization with PKCE
-This is a minimal example to try out the Spotify Authorization flow with PKCE.
+# spotify-lyric-analitics
 
-I highly recommend to read the offical Spotify guide about authorization: https://developer.spotify.com/documentation/general/guides/authorization-guide/#authorization-code-flow-with-proof-key-for-code-exchange-pkce
+## Project setup
+```
+npm install
+```
 
-In order to test this project you need to create an app in your Spotify Dashboard: https://developer.spotify.com/dashboard/applications
+### Compiles and hot-reloads for development
+```
+npm run serve
+```
 
-Here you will find the `CLIENT_ID` that you need to copy inside the `main.js` on line 233.
+### Compiles and minifies for production
+```
+npm run build
+```
 
-Don't forget to also add the redirect URI to your application.
+### Lints and fixes files
+```
+npm run lint
+```
 
-![Spotify Dashboard - App Settings](app-redirect-settings.jpg)
-
-## Install and run
-To locally host this example `http-server` is used.
-
-First install the dependecies by running `npm install`.
-
-Then serve the files in the `public` folder via `npm start`
-
-### Thanks to
-https://github.com/curityio/pkce-javascript-example
-
-https://github.com/spotify/web-api-auth-examples
+### Customize configuration
+See [Configuration Reference](https://cli.vuejs.org/config/).
