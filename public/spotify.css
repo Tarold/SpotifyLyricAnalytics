@@ -116,14 +116,20 @@ imfghg {
 .user-info {
   position: absolute;
   display: flex;
+  height: 100%;
   top: 0;
   left: 100px;
   flex-direction: column;
 }
-
+.user-options {
+  display: flex;
+  height: 100%;
+  justify-content: space-around;
+  flex-direction: column;
+}
 .user-name {
   font-weight: bold;
-  margin: auto 5px auto;
+  text-align: center;
 }
 
 .user-avatar:hover .user-options {
