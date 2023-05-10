@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Spotify Artist Search</title>
+    <link rel="stylesheet" type="text/css" href="reset.css" />
     <link rel="stylesheet" type="text/css" href="spotify.css" />
   </head>
   <body>
@@ -27,27 +28,37 @@
         data() {
           return {
             user: {
-              name: 'John Doe',
+              name: 'Loading',
               avatar:
                 'https://media.istockphoto.com/id/476085198/photo/businessman-silhouette-as-avatar-or-default-profile-picture.jpg?s=612x612&w=0&k=20&c=GVYAgYvyLb082gop8rg0XC_wNsu0qupfSLtO7q9wu38=',
-              email: 'johndoe@example.com',
-              location: 'New York'
+              email: 'Loading',
+              country: 'Loading'
             },
             showOptions: false
           }
         },
+        mounted() {
+          if (localStorage.getItem('user_data') === null) {
+            this.getProfile().then(data => {
+              this.user = data
+              localStorage.setItem('user_data', JSON.stringify(data))
+            })
+          } else {
+            this.user = JSON.parse(localStorage.getItem('user_data'))
+          }
+        },
         template: `
         <div class="user-container" @mouseleave="showOptions = false">
-          <div class="user-avatar-container" @mouseover="showOptions = true"> 
+          <div class="user-avatar-container" @mouseover="showOptions = true">
             <div class="user-avatar" >
-              <img :src="user.avatar" alt="User Avatar">  
+              <img :src="user.avatar" alt="User Avatar">
             </div>
-            <span class="user-name">{{ user.name }}</span></div>
+            <p class="user-name">{{ user.name }}</p></div>
           <div class="user-info" v-show="showOptions" >
             <div class="user-options">
               <div class="more-info">
                 <p>Email: {{ user.email }}</p>
-                <p>Location: {{ user.location }}</p>
+                <p>Country: {{ user.country }}</p>
                 </div>
                 <button @click="logout">Log out</button>
             </div>
@@ -59,16 +70,40 @@
             this.$emit('logout')
           },
           async getProfile() {
-            let accessToken = localStorage.getItem('access_token')
+            async function getData() {
+              let accessToken = localStorage.getItem('access_token')
 
-            const response = await fetch('https://api.spotify.com/v1/me', {
-              headers: {
-                Authorization: 'Bearer ' + accessToken
+              try {
+                const response = await fetch('https://api.spotify.com/v1/me', {
+                  headers: {
+                    Authorization: 'Bearer ' + accessToken
+                  }
+                })
+
+                if (!response.ok) {
+                  throw new Error('Request failed')
+                }
+
+                return response
+              } catch (error) {
+                await new Promise(resolve => setTimeout(resolve, 500))
+
+                return getData()
               }
-            })
-
-            const data = await response.json()
-            console.log('data :>> ', data)
+            }
+            return getData()
+              .then(response => {
+                return response.json()
+              })
+              .then(data => ({
+                name: data.display_name,
+                avatar:
+                  data.images.length > 0
+                    ? data.images[0]
+                    : 'https://media.istockphoto.com/id/476085198/photo/businessman-silhouette-as-avatar-or-default-profile-picture.jpg?s=612x612&w=0&k=20&c=GVYAgYvyLb082gop8rg0XC_wNsu0qupfSLtO7q9wu38=',
+                email: data.email,
+                country: data.country
+              }))
           }
         }
       }
