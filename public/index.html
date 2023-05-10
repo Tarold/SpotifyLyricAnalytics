@@ -157,17 +157,86 @@
       const app = Vue.createApp({
         data() {
           return {
-            status: 'none',
-            post: null,
             error: null,
+            loading: null,
             isAuthorized: false,
             clientId: 'd12d177d818048baa656df823fc9137d',
             redirectUri: 'http://127.0.0.1:8080/',
-            searchResults: []
+            lastSearch: {},
+            searchResults: [],
+            accessToken: '',
+            refreshToken: ''
           }
         },
-        created() {
+        watch: {
+          error: {
+            handler(data) {
+              localStorage.setItem('error', data)
+            }
+          },
+          loading: {
+            handler(data) {
+              localStorage.setItem('loading', data)
+            }
+          },
+          isAuthorized: {
+            handler(data) {
+              localStorage.setItem('is_authorized', data)
+            }
+          },
+          lastSearch: {
+            handler(data) {
+              localStorage.setItem('last_searh', data)
+            }
+          },
+          searchResults: {
+            handler(data) {
+              localStorage.setItem('search_result', data)
+            }
+          },
+          accessToken: {
+            handler(data) {
+              localStorage.setItem('access_token', data)
+            }
+          },
+          refreshToken: {
+            handler(data) {
+              localStorage.setItem('refresh_token', data)
+            }
+          }
+        },
+        mounted() {
+          this.error =
+            localStorage.getItem('error') === null
+              ? null
+              : localStorage.getItem('error')
+          this.loading =
+            localStorage.getItem('loading') === null
+              ? null
+              : localStorage.getItem('loading')
+          this.isAuthorized =
+            localStorage.getItem('is_authorized') === null
+              ? false
+              : localStorage.getItem('is_authorized')
+          this.lastSearch =
+            localStorage.getItem('last_searh') === null
+              ? {}
+              : localStorage.getItem('last_searh')
+          this.searchResults =
+            localStorage.getItem('search_result') === null
+              ? []
+              : localStorage.getItem('search_result')
+          this.accessToken =
+            localStorage.getItem('access_token') === null
+              ? null
+              : localStorage.getItem('access_token')
+          this.refreshToken =
+            localStorage.getItem('refresh_token') === null
+              ? null
+              : localStorage.getItem('refresh_token')
+
           const code = new URLSearchParams(window.location.search).get('code')
+          console.log('code :>> ', code)
           if (code) {
             this.exchangeToken(code)
             window.history.replaceState({}, document.title, '/')
@@ -176,7 +245,6 @@
         methods: {
           logOut() {
             localStorage.clear()
-            this.isAuthorized = false
           },
           test() {
             const codeVerifier = new URLSearchParams(
@@ -300,9 +368,8 @@
                 return response.json()
               })
               .then(data => {
-                localStorage.setItem('access_token', data.access_token)
-                localStorage.setItem('refresh_token', data.refresh_token)
-
+                this.accessToken = data.access_token
+                this.refreshToken = data.refresh_token
                 this.isAuthorized = true
               })
               .catch(error => {
