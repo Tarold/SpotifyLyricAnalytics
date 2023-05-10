@@ -11,9 +11,7 @@
         :client_id="clientId"
         :redirect_uri="redirectUri"
       ></auth-component>
-      <user-component></user-component>
-      <button v-if="isAuthorized" @click="logOut">Log out</button>
-
+      <user-component v-if="isAuthorized" @logout="logOut"></user-component>
       <search-bar v-if="isAuthorized" @search="searchArtists"></search-bar>
       <search-results
         v-if="searchResults.length > 0"
@@ -26,12 +24,40 @@
     <script>
       const userComponent = {
         props: ['client_id', 'redirect_uri'],
+        data() {
+          return {
+            user: {
+              name: 'John Doe',
+              avatar:
+                'https://media.istockphoto.com/id/476085198/photo/businessman-silhouette-as-avatar-or-default-profile-picture.jpg?s=612x612&w=0&k=20&c=GVYAgYvyLb082gop8rg0XC_wNsu0qupfSLtO7q9wu38=',
+              email: 'johndoe@example.com',
+              location: 'New York'
+            },
+            showOptions: false
+          }
+        },
         template: `
-            <div class="user-container">
-                <button @click="getProfile">get</button>
+        <div class="user-container" @mouseleave="showOptions = false">
+          <div class="user-avatar-container" @mouseover="showOptions = true"> 
+            <div class="user-avatar" >
+              <img :src="user.avatar" alt="User Avatar">  
             </div>
+            <span class="user-name">{{ user.name }}</span></div>
+          <div class="user-info" v-show="showOptions" >
+            <div class="user-options">
+              <div class="more-info">
+                <p>Email: {{ user.email }}</p>
+                <p>Location: {{ user.location }}</p>
+                </div>
+                <button @click="logout">Log out</button>
+            </div>
+          </div>
+        </div>
           `,
         methods: {
+          logout() {
+            this.$emit('logout')
+          },
           async getProfile() {
             let accessToken = localStorage.getItem('access_token')
 
@@ -267,6 +293,7 @@
         },
         methods: {
           logOut() {
+            this.isAuthorized = false
             localStorage.clear()
           },
           authorizeUser() {
