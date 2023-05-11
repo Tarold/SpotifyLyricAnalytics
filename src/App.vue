@@ -8,23 +8,38 @@
         v-if="!isAuthorized"
         :client_id="clientId"
       ></auth-component>
-      <user-component v-if="isAuthorized" @logout="logOut"></user-component>
-      <search-bar v-if="isAuthorized" @search="searchArtists"></search-bar>
-      <search-result
-        v-if="searchResults.length > 0"
-        :results="searchResults"
-      ></search-result>
+      <div v-if="isAuthorized">
+        <user-component @logout="logOut"></user-component>
+
+        <div v-if="status === 'search'">
+          <search-bar @search="searchArtists"></search-bar>
+          <search-result
+            v-if="searchResults.length"
+            :results="searchResults"
+            @artist-start="selectArtist"
+          ></search-result>
+        </div>
+        <div v-if="status === 'work'">
+          <artist-viewer
+            :artist="lastSearch"
+            @getSong="getSong"
+            @getAlbum="getAlbum"
+            @getAll="getAll"
+          ></artist-viewer>
+        </div>
+      </div>
     </div>
   </body>
 </template>
 
 <script>
-import { searchArtists, exchangeToken } from './api'
+import { getArtist, exchangeToken } from './api'
 
 import UserComponent from './components/UserComponent.vue'
 import AuthComponent from './components/AuthComponent.vue'
 import SearchResult from './components/SearchResult.vue'
 import SearchBar from './components/SearchBar.vue'
+import ArtistViewer from './components/ArtistViewer.vue'
 
 export default {
   name: 'App',
@@ -32,13 +47,15 @@ export default {
     UserComponent,
     AuthComponent,
     SearchResult,
-    SearchBar
+    SearchBar,
+    ArtistViewer
   },
   data () {
     return {
       error: null,
       loading: null,
       isAuthorized: false,
+      status: '',
       lastSearch: {},
       searchResults: [],
       accessToken: '',
@@ -61,14 +78,19 @@ export default {
         localStorage.setItem('is_authorized', data)
       }
     },
+    status: {
+      handler (data) {
+        localStorage.setItem('status', data)
+      }
+    },
     lastSearch: {
       handler (data) {
-        localStorage.setItem('last_searh', data)
+        localStorage.setItem('last_searh', JSON.stringify(data))
       }
     },
     searchResults: {
       handler (data) {
-        localStorage.setItem('search_result', data)
+        localStorage.setItem('search_result', JSON.stringify(data))
       }
     },
     accessToken: {
@@ -95,14 +117,18 @@ export default {
       localStorage.getItem('is_authorized') === null
         ? false
         : localStorage.getItem('is_authorized')
+    this.status =
+      localStorage.getItem('status') === null
+        ? false
+        : localStorage.getItem('status')
     this.lastSearch =
       localStorage.getItem('last_searh') === null
         ? {}
-        : localStorage.getItem('last_searh')
+        : JSON.parse(localStorage.getItem('last_searh'))
     this.searchResults =
       localStorage.getItem('search_result') === null
         ? []
-        : localStorage.getItem('search_result')
+        : JSON.parse(localStorage.getItem('search_result'))
     this.accessToken =
       localStorage.getItem('access_token') === null
         ? null
@@ -124,11 +150,25 @@ export default {
       this.isAuthorized = false
       localStorage.clear()
     },
+    async getToken (code) {
+      exchangeToken(code)
+        .then(data => {
+          console.log('data :>> ', data)
+          this.accessToken = data.access_token
+          this.refreshToken = data.refresh_token
+          this.isAuthorized = true
+          this.status = 'search'
+        })
+        .catch(error => {
+          console.error('Error exchangeToken:', error)
+        })
+    },
     async searchArtists (artistName) {
       this.error = null
       this.loading = true
-      searchArtists(artistName)
+      getArtist(artistName)
         .then(data => {
+          console.log('data :>> ', data)
           this.searchResults = data
           this.loading = null
         })
@@ -138,17 +178,19 @@ export default {
           console.error('Error searching artists:', error)
         })
     },
-    async getToken (code) {
-      exchangeToken(code)
-        .then(data => {
-          console.log('data :>> ', data)
-          this.accessToken = data.access_token
-          this.refreshToken = data.refresh_token
-          this.isAuthorized = true
-        })
-        .catch(error => {
-          console.error('Error exchangeToken:', error)
-        })
+    selectArtist (artist) {
+      console.log('artist :>> ', artist)
+      this.lastSearch = artist
+      this.status = 'work'
+    },
+    getSong () {
+      console.log('getSong :>> ')
+    },
+    getAlbum () {
+      console.log('getAlbum :>> ')
+    },
+    getAll () {
+      console.log('getAll :>> ')
     }
   }
 }
@@ -156,6 +198,11 @@ export default {
 
 <style>
 @import 'reset.css';
+
+#app {
+  max-width: 860px;
+  margin: 0 auto;
+}
 
 /* Body Styles */
 body {
@@ -217,6 +264,15 @@ input[type='text'] {
   border-radius: 20px;
 }
 
+button {
+  background-color: #1db954;
+  color: #fff;
+  font-size: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
 button[type='submit'] {
   background-color: #1db954;
   color: #fff;
