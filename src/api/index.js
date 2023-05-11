@@ -27,28 +27,6 @@ export async function getMe () {
   }
 }
 
-export async function searchArtists (artistName) {
-  const accessToken = localStorage.getItem('access_token')
-  fetch(
-    `https://api.spotify.com/v1/search?q=${artistName}&type=artist&limit=1`,
-    {
-      headers: {
-        Authorization: 'Bearer ' + accessToken
-      }
-    }
-  )
-    .then(response => response.json())
-    .then(data =>
-      data.artists.items.map(artist => ({
-        id: artist.id,
-        name: artist.name,
-        image: artist.images[0]?.url || '',
-        albums: []
-      }))
-    )
-    .catch(error => error)
-}
-
 export async function exchangeToken (code) {
   let codeVerifier = localStorage.getItem('codeVerifier')
 
@@ -74,3 +52,30 @@ export async function exchangeToken (code) {
     })
     .catch(error => error)
 }
+export async function getArtist (artistName) {
+  const accessToken = localStorage.getItem('access_token')
+  return fetch(
+    `https://api.spotify.com/v1/search?q=${artistName}&type=artist`,
+    {
+      headers: {
+        Authorization: 'Bearer ' + accessToken
+      }
+    }
+  )
+    .then(response => response.json())
+    .then(data =>
+      data.artists.items.map(artist => ({
+        id: artist.id,
+        name: artist.name,
+        image: artist.images[0]?.url || '',
+        albums: []
+      }))
+    )
+    .catch(error => error)
+}
+
+export async function getAlbums () {}
+
+export async function getSongs () {}
+
+export async function getLyrics () {}
