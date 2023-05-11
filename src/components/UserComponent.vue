@@ -36,7 +36,7 @@ export default {
       showOptions: false
     }
   },
-  mounted () {
+  created () {
     if (localStorage.getItem('user_data') === null) {
       this.getProfile().then(data => {
         this.user = data

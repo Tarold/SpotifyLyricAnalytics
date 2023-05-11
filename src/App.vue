@@ -1,15 +1,12 @@
 <template>
   <head>
     <title>Spotify Artist Search</title>
-    <link rel="stylesheet" type="text/css" href="reset.css" />
-    <link rel="stylesheet" type="text/css" href="spotify.css" />
   </head>
   <body>
     <div id="app">
       <auth-component
         v-if="!isAuthorized"
         :client_id="clientId"
-        :redirect_uri="redirectUri"
       ></auth-component>
       <user-component v-if="isAuthorized" @logout="logOut"></user-component>
       <search-bar v-if="isAuthorized" @search="searchArtists"></search-bar>
@@ -22,6 +19,8 @@
 </template>
 
 <script>
+import { searchArtists, exchangeToken } from './api'
+
 import UserComponent from './components/UserComponent.vue'
 import AuthComponent from './components/AuthComponent.vue'
 import SearchResult from './components/SearchResult.vue'
@@ -40,8 +39,6 @@ export default {
       error: null,
       loading: null,
       isAuthorized: false,
-      clientId: 'd12d177d818048baa656df823fc9137d',
-      redirectUri: 'http://127.0.0.1:8080/',
       lastSearch: {},
       searchResults: [],
       accessToken: '',
@@ -118,7 +115,7 @@ export default {
     const code = new URLSearchParams(window.location.search).get('code')
 
     if (code) {
-      this.exchangeToken(code)
+      this.getToken(code)
       window.history.replaceState({}, document.title, '/')
     }
   },
@@ -127,69 +124,30 @@ export default {
       this.isAuthorized = false
       localStorage.clear()
     },
-    authorizeUser () {
-      //this.isAuthorized = true
-    },
     async searchArtists (artistName) {
-      try {
-        this.error = this.post = null
-        this.loading = true
-        const accessToken = localStorage.getItem('access_token')
-        const response = await fetch(
-          `https://api.spotify.com/v1/search?q=${artistName}&type=artist&limit=1`,
-          {
-            headers: {
-              Authorization: 'Bearer ' + accessToken
-            }
-          }
-        )
-        const data = await response.json()
-
-        // Extract relevant information from the API response
-        const artists = data.artists.items.map(artist => ({
-          id: artist.id,
-          name: artist.name,
-          image: artist.images[0]?.url || '',
-          albums: []
-        }))
-
-        this.searchResults = artists
-      } catch (error) {
-        this.error = true
-        this.loading = this.post = null
-        console.error(error)
-      }
-    },
-    async exchangeToken (code) {
-      let codeVerifier = localStorage.getItem('codeVerifier')
-
-      let body = new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: this.redirectUri,
-        client_id: this.clientId,
-        code_verifier: codeVerifier
-      })
-      await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: body
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('HTTP status ' + response.status)
-          }
-          return response.json()
-        })
+      this.error = null
+      this.loading = true
+      searchArtists(artistName)
         .then(data => {
+          this.searchResults = data
+          this.loading = null
+        })
+        .catch(error => {
+          this.error = true
+          this.loading = null
+          console.error('Error searching artists:', error)
+        })
+    },
+    async getToken (code) {
+      exchangeToken(code)
+        .then(data => {
+          console.log('data :>> ', data)
           this.accessToken = data.access_token
           this.refreshToken = data.refresh_token
           this.isAuthorized = true
         })
         .catch(error => {
-          console.error('Error:', error)
+          console.error('Error exchangeToken:', error)
         })
     }
   }

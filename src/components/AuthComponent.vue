@@ -7,9 +7,10 @@
 </template>
 
 <script>
+import { clientId, redirectUri } from './../configs'
+
 export default {
   name: 'AuthComponent',
-  props: ['client_id', 'redirect_uri'],
   methods: {
     authorize () {
       const codeVerifier = this.generateRandomString(64)
@@ -20,11 +21,11 @@ export default {
           'https://accounts.spotify.com/authorize',
           {
             response_type: 'code',
-            client_id: this.client_id,
+            client_id: clientId,
             scope: 'user-read-private user-read-email',
             code_challenge_method: 'S256',
             code_challenge,
-            redirect_uri: this.redirect_uri
+            redirect_uri: redirectUri
           }
         )
       })
