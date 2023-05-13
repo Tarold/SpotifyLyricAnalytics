@@ -56,23 +56,10 @@ export default {
       albums: [
         {
           id: 'album1',
-          name: 'Album 1',
+          name: 'Loading',
           selected: false,
           showSongs: false,
-          songs: [
-            { id: 'song1', name: 'Song 1', selected: false },
-            { id: 'song2', name: 'Song 2', selected: false }
-          ]
-        },
-        {
-          id: 'album2',
-          name: 'Album 2',
-          selected: false,
-          showSongs: false,
-          songs: [
-            { id: 'song3', name: 'Song 3', selected: false },
-            { id: 'song4', name: 'Song 4', selected: false }
-          ]
+          songs: [{ id: 'song1', name: 'Loading...', selected: false }]
         }
       ]
     }
@@ -82,8 +69,18 @@ export default {
   props: ['artist'],
   methods: {
     getAll () {
-      console.log('object :>> ', this.artist.id)
-      console.log('return :>> ', getAllAlbums(this.artist.id)) //this.$emit('getAll')
+      getAllAlbums(this.artist.id)
+        .then(data =>
+          data.map(item => {
+            item.selected = false
+            item.showSongs = false
+            item.songs = [{ id: 'song1', name: 'Loading...', selected: false }]
+            return item
+          })
+        )
+        .then(albums => (this.albums = albums))
+
+      //this.$emit('getAll')
     },
     getAlbum () {
       this.$emit('getAlbum')
@@ -122,6 +119,7 @@ export default {
     albums: {
       deep: true,
       handler () {
+        console.log('object :>> ', this.albums)
         const allSelected = this.albums.every(album => album.selected)
         this.selectAll = allSelected
       }
