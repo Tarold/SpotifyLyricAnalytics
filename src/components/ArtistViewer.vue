@@ -17,26 +17,44 @@
         <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" />
         <label for="selectAll">Select All Albums</label>
 
-        <ul>
-          <li v-for="album in albums" :key="album.id">
-            <input
-              type="checkbox"
-              v-model="album.selected"
-              @change="updateAlbumSelection(album)"
-              @click="toggleAlbumValue(album)"
-            />
-            <label>{{ album.name }}</label>
+        <ul v-if="albums">
+          <li v-for="album in albums" :key="album.id" class="album">
+            <div class="album-container">
+              <input
+                type="checkbox"
+                v-model="album.selected"
+                @change="updateAlbumSelection(album)"
+                @click="toggleAlbumValue(album)"
+              />
+              <img
+                :src="getAlbumImage(album)"
+                alt="Album Image"
+                class="album-img"
+              />
 
-            <button @click="toggleSongsVisibility(album)">Open/Close</button>
+              <label class="album-name">{{ album.name }}</label>
+
+              <p class="album-date">Release Date: {{ album.release_date }}</p>
+              <button @click="toggleSongsVisibility(album)">Open/Close</button>
+            </div>
 
             <ul v-show="album.showSongs">
-              <li v-for="song in album.songs" :key="song.id">
+              <li
+                v-for="song in album.songs"
+                :key="song.id"
+                class="song-container"
+              >
                 <input
                   type="checkbox"
                   v-model="song.selected"
                   @change="updateSongSelection(album)"
                 />
-                <label>{{ song.name }}</label>
+                <label class="song-name">{{ song.name }}</label>
+                <audio
+                  v-if="song.preview_url"
+                  :src="song.preview_url"
+                  controls
+                ></audio>
               </li>
             </ul>
           </li>
@@ -47,7 +65,7 @@
 </template>
 
 <script>
-import { getAllAlbums } from '@/api'
+import { getAllAlbums, getAlbumSongs } from '@/api'
 
 export default {
   data () {
@@ -59,7 +77,7 @@ export default {
           name: 'Loading',
           selected: false,
           showSongs: false,
-          songs: [{ id: 'song1', name: 'Loading...', selected: false }]
+          songs: []
         }
       ]
     }
@@ -68,13 +86,20 @@ export default {
   name: 'ArtistViewer',
   props: ['artist'],
   methods: {
+    getAlbumImage (album) {
+      if (album.images && album.images.length > 0) {
+        return album.images[0].url
+      }
+      // Return a placeholder image URL or handle the case where no image is available
+      return 'https://example.com/placeholder-image.jpg'
+    },
     getAll () {
       getAllAlbums(this.artist.id)
         .then(data =>
           data.map(item => {
             item.selected = false
             item.showSongs = false
-            item.songs = [{ id: 'song1', name: 'Loading...', selected: false }]
+            item.songs = []
             return item
           })
         )
@@ -107,6 +132,19 @@ export default {
     },
     toggleSongsVisibility (album) {
       album.showSongs = !album.showSongs
+      if (album.songs.length === 0) {
+        getAlbumSongs(album.id)
+          .then(data => {
+            album.songs = data
+          })
+          .then(() => {
+            if (album.selected) {
+              album.songs.forEach(song => {
+                song.selected = album.selected
+              })
+            }
+          })
+      }
     },
     toggleAlbumValue (album) {
       album.selected = !album.selected
@@ -115,15 +153,57 @@ export default {
       })
     }
   },
+  mounted () {
+    if (localStorage.getItem('albums')) {
+      this.albums = JSON.parse(localStorage.getItem('albums'))
+      this.selectAll = localStorage.getItem('select_all')
+    } else {
+      this.getAll()
+    }
+  },
   watch: {
     albums: {
       deep: true,
-      handler () {
-        console.log('object :>> ', this.albums)
-        const allSelected = this.albums.every(album => album.selected)
+      handler (data) {
+        const allSelected = data.every(album => album.selected)
         this.selectAll = allSelected
+        localStorage.setItem('albums', JSON.stringify(data))
+        localStorage.setItem('select_all', allSelected)
       }
     }
   }
 }
 </script>
+
+<style scoped>
+.artist-img {
+  height: 300px;
+}
+.album-container,
+.song-container {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
+  padding: 5px;
+  margin: 10px 0;
+  justify-content: space-between;
+}
+
+.album-img,
+.album-name,
+.song-name {
+  width: 100px;
+  margin-left: 15px;
+  margin-right: auto;
+}
+.album-img {
+  margin-right: 0;
+}
+.song-name {
+  white-space: nowrap;
+}
+.album-date {
+  margin-right: 15px;
+}
+</style>

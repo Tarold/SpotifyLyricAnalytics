@@ -108,12 +108,12 @@ async function getAlbums (uri, albums) {
 }
 
 export async function getAlbumSongs (albumId) {
-  return getSongs(`https://api.spotify.com/v1/albums/${albumId}/tracks`)
+  return getSongs(`https://api.spotify.com/v1/albums/${albumId}/tracks`, [])
 }
 function getSongs (irl, songs) {
   const accessToken = localStorage.getItem('access_token')
 
-  fetch(irl, {
+  return fetch(irl, {
     headers: {
       Authorization: 'Bearer ' + accessToken
     }
@@ -131,7 +131,6 @@ function getSongs (irl, songs) {
       if (data.next) {
         return getSongs(data.next, merge_songs)
       } else {
-        console.log('songs :>> ', merge_songs)
         return merge_songs
       }
     })
