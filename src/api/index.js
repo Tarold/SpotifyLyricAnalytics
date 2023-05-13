@@ -73,9 +73,72 @@ export async function getArtist (artistName) {
     )
     .catch(error => error)
 }
+export async function getAllAlbums (artist_id) {
+  return await getAlbums(
+    `https://api.spotify.com/v1/artists/${artist_id}/albums`,
+    []
+  )
+}
 
-export async function getAlbums () {}
+async function getAlbums (uri, albums) {
+  const accessToken = localStorage.getItem('access_token')
 
-export async function getSongs () {}
+  return fetch(uri, {
+    headers: {
+      Authorization: 'Bearer ' + accessToken
+    }
+  })
+    .then(async response => {
+      if (response.ok) {
+        return response.json()
+      } else {
+        throw await response.json()
+      }
+    })
+    .then(data => {
+      const merge_albums = [...albums, ...data.items]
+      if (data.next) {
+        return getAlbums(data.next, merge_albums)
+      } else {
+        console.log('merge_albums :>> ', merge_albums)
+        return merge_albums
+      }
+    })
+    .catch(error => error)
+}
+
+export async function getAlbumSongs (albumId) {
+  return getSongs(`https://api.spotify.com/v1/albums/${albumId}/tracks`)
+}
+function getSongs (irl, songs) {
+  const accessToken = localStorage.getItem('access_token')
+
+  fetch(irl, {
+    headers: {
+      Authorization: 'Bearer ' + accessToken
+    }
+  })
+    .then(async response => {
+      if (response.ok) {
+        return response.json()
+      } else {
+        throw await response.json()
+      }
+    })
+    .then(data => {
+      const merge_songs = [...songs, ...data.items]
+
+      if (data.next) {
+        return getSongs(data.next, merge_songs)
+      } else {
+        console.log('songs :>> ', merge_songs)
+        return merge_songs
+      }
+    })
+    .catch(error => error)
+}
 
 export async function getLyrics () {}
+
+export async function getAlbum () {}
+export async function getSong () {}

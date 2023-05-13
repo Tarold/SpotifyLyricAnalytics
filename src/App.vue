@@ -182,15 +182,6 @@ export default {
       console.log('artist :>> ', artist)
       this.lastSearch = artist
       this.status = 'work'
-    },
-    getSong () {
-      console.log('getSong :>> ')
-    },
-    getAlbum () {
-      console.log('getAlbum :>> ')
-    },
-    getAll () {
-      console.log('getAll :>> ')
     }
   }
 }
